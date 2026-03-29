@@ -1,5 +1,7 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import * as path from 'path';
+import * as fs from 'fs';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
@@ -11,13 +13,28 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: {
+      unpack: '**/*.node',
+      unpackDir: '**/node_modules/better-sqlite3',
+    },
     name: 'OpenDictate',
     executableName: 'OpenDictate',
     appVersion: '1.0.0',
     appCopyright: 'Copyright © 2026 Raghavendra K J',
   },
   rebuildConfig: {},
+  hooks: {
+    packageAfterCopy: async (_config, buildPath) => {
+      const nativeModules = ['better-sqlite3', 'bindings', 'file-uri-to-path'];
+      for (const mod of nativeModules) {
+        const src = path.join(__dirname, 'node_modules', mod);
+        const dest = path.join(buildPath, 'node_modules', mod);
+        if (fs.existsSync(src)) {
+          fs.cpSync(src, dest, { recursive: true });
+        }
+      }
+    },
+  },
   publishers: [
     new PublisherGithub({
       repository: {
