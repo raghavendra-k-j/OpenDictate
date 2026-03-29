@@ -301,8 +301,9 @@ ipcMain.handle('overlay:transcribe', async (_event, audioBuffer: ArrayBuffer, du
     }
 
     if (mode === 'transcribe-refine') {
-      if (!settings.aiApiKey) throw new Error('AI API key not configured.');
-      text = await refineText(text, settings.aiApiKey, settings.aiApiUrl, settings.aiModel, settings.systemPrompt);
+      const refineKey = settings.aiApiKey || settings.geminiApiKey;
+      if (!refineKey) throw new Error('AI API key not configured.');
+      text = await refineText(text, refineKey, settings.aiApiUrl, settings.aiModel, settings.systemPrompt);
     }
 
     await insertText(text);
@@ -322,8 +323,9 @@ ipcMain.handle('overlay:transcribe-text', async (_event, text: string, mode: str
 
     if (mode === 'transcribe-refine') {
       const settings = loadSettings();
-      if (!settings.aiApiKey) throw new Error('AI API key not configured.');
-      result = await refineText(result, settings.aiApiKey, settings.aiApiUrl, settings.aiModel, settings.systemPrompt);
+      const refineKey = settings.aiApiKey || settings.geminiApiKey;
+      if (!refineKey) throw new Error('AI API key not configured.');
+      result = await refineText(result, refineKey, settings.aiApiUrl, settings.aiModel, settings.systemPrompt);
     }
 
     await insertText(result);

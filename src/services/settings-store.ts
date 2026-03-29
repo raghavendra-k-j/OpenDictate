@@ -41,8 +41,8 @@ const defaults: AppSettings = {
   geminiApiKey: '',
   geminiModel: 'gemini-2.0-flash',
   aiApiKey: '',
-  aiApiUrl: 'https://api.openai.com/v1/chat/completions',
-  aiModel: 'gpt-4o-mini',
+  aiApiUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+  aiModel: 'gemini-2.0-flash',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
 };
 
