@@ -1,5 +1,4 @@
 import './index.css';
-import type { Note, Entry } from './types';
 
 // ── State ──
 let activeNoteId: number | null = null;
@@ -14,9 +13,10 @@ const newNoteBtn = document.getElementById('new-note-btn')!;
 const emptyState = document.getElementById('empty-state')!;
 const noteView = document.getElementById('note-view')!;
 const noteTitle = document.getElementById('note-title') as HTMLInputElement;
-const entriesContainer = document.getElementById('entries-container')!;
+const noteContent = document.getElementById('note-content') as HTMLTextAreaElement;
 const recordBtn = document.getElementById('record-btn')!;
 const recIndicator = document.getElementById('recording-indicator')!;
+const copyNoteBtn = document.getElementById('copy-note-btn')!;
 const deleteNoteBtn = document.getElementById('delete-note-btn')!;
 const saveStatus = document.getElementById('save-status')!;
 const settingsModal = document.getElementById('settings-modal')!;
@@ -28,6 +28,17 @@ const clearCurlBtn = document.getElementById('clear-curl-btn')!;
 const settingsStatus = document.getElementById('settings-status')!;
 const configBadge = document.getElementById('config-badge')!;
 const configBadgeText = document.getElementById('config-badge-text')!;
+const shortcutInput = document.getElementById('shortcut-input') as HTMLInputElement;
+const saveShortcutBtn = document.getElementById('save-shortcut-btn')!;
+const overlayCornerSelect = document.getElementById('overlay-corner') as HTMLSelectElement;
+const shortcutStatus = document.getElementById('shortcut-status')!;
+const geminiApiKeyInput = document.getElementById('gemini-api-key') as HTMLInputElement;
+const geminiModelInput = document.getElementById('gemini-model') as HTMLInputElement;
+const geminiSystemPromptInput = document.getElementById('gemini-system-prompt') as HTMLTextAreaElement;
+const saveGeminiBtn = document.getElementById('save-gemini-btn')!;
+const geminiStatus = document.getElementById('gemini-status')!;
+
+let pendingShortcut = '';
 
 // ── Helpers ──
 function formatTime(iso: string): string {
@@ -53,6 +64,12 @@ function debounce(key: string, fn: () => void, ms = 600) {
   }, ms));
 }
 
+function escapeHtml(s: string): string {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
 // ── Notes sidebar ──
 async function refreshNotesList() {
   const notes = await window.openDictate.getAllNotes();
@@ -73,12 +90,6 @@ async function refreshNotesList() {
   }
 }
 
-function escapeHtml(s: string): string {
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
-}
-
 // ── Open note ──
 async function openNote(id: number) {
   activeNoteId = id;
@@ -88,95 +99,41 @@ async function openNote(id: number) {
   emptyState.style.display = 'none';
   noteView.style.display = 'flex';
   noteTitle.value = note.title;
+  noteContent.value = note.content;
 
-  await refreshEntries();
   await refreshNotesList();
 }
 
-// ── Entries ──
-async function refreshEntries() {
+// ── Insert text at cursor position ──
+function insertAtCursor(text: string) {
+  const start = noteContent.selectionStart;
+  const end = noteContent.selectionEnd;
+  const before = noteContent.value.substring(0, start);
+  const after = noteContent.value.substring(end);
+
+  // Add a space before if there's existing text and no trailing space/newline
+  const separator = before.length > 0 && !/[\s\n]$/.test(before) ? ' ' : '';
+
+  noteContent.value = before + separator + text + after;
+
+  // Place cursor after inserted text
+  const newPos = start + separator.length + text.length;
+  noteContent.selectionStart = newPos;
+  noteContent.selectionEnd = newPos;
+  noteContent.focus();
+
+  // Trigger auto-save
+  saveNoteContent();
+}
+
+function saveNoteContent() {
   if (!activeNoteId) return;
-  const entries = await window.openDictate.getEntries(activeNoteId);
-  entriesContainer.innerHTML = '';
-
-  for (const entry of entries) {
-    entriesContainer.appendChild(createEntryCard(entry));
-  }
-
-  scrollToBottom();
-}
-
-function createEntryCard(entry: Entry): HTMLElement {
-  const card = document.createElement('div');
-  card.className = 'entry-card';
-  card.dataset.entryId = String(entry.id);
-
-  const header = document.createElement('div');
-  header.className = 'entry-header';
-
-  const time = document.createElement('span');
-  time.className = 'entry-time';
-  time.textContent = formatTime(entry.created_at);
-
-  const actions = document.createElement('div');
-  actions.className = 'entry-actions';
-
-  const copyBtn = document.createElement('button');
-  copyBtn.className = 'btn-icon';
-  copyBtn.title = 'Copy';
-  copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-  copyBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(textarea.value);
-    copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
-    setTimeout(() => {
-      copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-    }, 1500);
-  });
-
-  const delBtn = document.createElement('button');
-  delBtn.className = 'btn-icon btn-danger';
-  delBtn.title = 'Delete';
-  delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
-  delBtn.addEventListener('click', async () => {
-    await window.openDictate.deleteEntry(entry.id);
-    card.remove();
-    showSaveStatus('Entry deleted');
-  });
-
-  actions.append(copyBtn, delBtn);
-  header.append(time, actions);
-
-  const textarea = document.createElement('textarea');
-  textarea.className = 'entry-content';
-  textarea.value = entry.content;
-  textarea.placeholder = 'Empty entry...';
-  textarea.rows = 1;
-
-  // Auto-resize
-  const autoResize = () => {
-    textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
-  };
-
-  textarea.addEventListener('input', () => {
-    autoResize();
-    showSaveStatus('Saving...');
-    debounce(`entry-${entry.id}`, async () => {
-      await window.openDictate.updateEntry(entry.id, textarea.value);
-      showSaveStatus('All changes saved');
-    });
-  });
-
-  // Resize after append
-  requestAnimationFrame(autoResize);
-
-  card.append(header, textarea);
-  return card;
-}
-
-function scrollToBottom() {
-  requestAnimationFrame(() => {
-    entriesContainer.scrollTop = entriesContainer.scrollHeight;
+  const id = activeNoteId;
+  showSaveStatus('Saving...');
+  debounce('note-content', async () => {
+    await window.openDictate.updateNoteContent(id, noteContent.value);
+    showSaveStatus('All changes saved');
+    await refreshNotesList();
   });
 }
 
@@ -213,8 +170,6 @@ async function stopRecordingAndTranscribe() {
   recordBtn.classList.add('processing');
   recIndicator.style.display = 'none';
 
-  const noteId = activeNoteId;
-
   const result = await new Promise<{ buffer: ArrayBuffer; durationMs: number }>((resolve) => {
     mediaRecorder!.onstop = async () => {
       const durationMs = Date.now() - recordingStartTime;
@@ -228,10 +183,10 @@ async function stopRecordingAndTranscribe() {
 
   try {
     showSaveStatus('Transcribing...');
-    const response = await window.openDictate.sendAudio(result.buffer, result.durationMs, noteId);
+    const response = await window.openDictate.sendAudio(result.buffer, result.durationMs);
 
-    if (response.success) {
-      await refreshEntries();
+    if (response.success && response.text) {
+      insertAtCursor(response.text);
       showSaveStatus('All changes saved');
     } else {
       showSaveStatus(response.error ?? 'Transcription failed');
@@ -289,6 +244,19 @@ noteTitle.addEventListener('input', () => {
   });
 });
 
+noteContent.addEventListener('input', () => {
+  saveNoteContent();
+});
+
+copyNoteBtn.addEventListener('click', () => {
+  navigator.clipboard.writeText(noteContent.value);
+  const origInnerHTML = copyNoteBtn.innerHTML;
+  copyNoteBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+  setTimeout(() => {
+    copyNoteBtn.innerHTML = origInnerHTML;
+  }, 1500);
+});
+
 deleteNoteBtn.addEventListener('click', async () => {
   if (!activeNoteId) return;
   await window.openDictate.deleteNote(activeNoteId);
@@ -301,7 +269,6 @@ deleteNoteBtn.addEventListener('click', async () => {
 recordBtn.addEventListener('click', () => {
   if (!activeNoteId) return;
   if (recordBtn.classList.contains('recording')) {
-    window.openDictate.onStopRecording; // handled via IPC below
     stopRecordingAndTranscribe();
   } else if (!recordBtn.classList.contains('processing')) {
     startRecording();
@@ -350,13 +317,94 @@ clearCurlBtn.addEventListener('click', async () => {
   await refreshConfig();
 });
 
+// ── Shortcut recorder ──
+function keyEventToAccelerator(e: KeyboardEvent): string | null {
+  const parts: string[] = [];
+  if (e.ctrlKey || e.metaKey) parts.push('CommandOrControl');
+  if (e.shiftKey) parts.push('Shift');
+  if (e.altKey) parts.push('Alt');
+
+  const key = e.key;
+  if (['Control', 'Shift', 'Alt', 'Meta'].includes(key)) return null; // modifiers only
+
+  if (key === ' ') parts.push('Space');
+  else if (key.length === 1) parts.push(key.toUpperCase());
+  else parts.push(key); // F1, F2, etc.
+
+  return parts.join('+');
+}
+
+shortcutInput.addEventListener('keydown', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  shortcutInput.classList.add('recording-keys');
+  const accel = keyEventToAccelerator(e);
+  if (accel) {
+    pendingShortcut = accel;
+    shortcutInput.value = accel;
+    shortcutInput.classList.remove('recording-keys');
+  }
+});
+
+shortcutInput.addEventListener('blur', () => {
+  shortcutInput.classList.remove('recording-keys');
+});
+
+saveShortcutBtn.addEventListener('click', async () => {
+  const settings: Record<string, unknown> = {};
+  if (pendingShortcut) settings.shortcut = pendingShortcut;
+  settings.overlayCorner = overlayCornerSelect.value;
+
+  saveShortcutBtn.setAttribute('disabled', '');
+  const result = await window.openDictate.saveSettings(settings);
+  saveShortcutBtn.removeAttribute('disabled');
+
+  if (result.success) {
+    shortcutStatus.textContent = `Saved! Shortcut: ${result.shortcut}`;
+    shortcutStatus.className = 'settings-msg success';
+    pendingShortcut = '';
+  } else {
+    shortcutStatus.textContent = result.error ?? 'Failed to save';
+    shortcutStatus.className = 'settings-msg error';
+  }
+});
+
+async function loadSettingsUI() {
+  const settings = await window.openDictate.getSettings();
+  shortcutInput.value = settings.shortcut;
+  overlayCornerSelect.value = settings.overlayCorner;
+  geminiApiKeyInput.value = settings.geminiApiKey;
+  geminiModelInput.value = settings.geminiModel;
+  geminiSystemPromptInput.value = settings.systemPrompt;
+}
+
 // IPC event handlers from global shortcut
 window.openDictate.onStartRecording(() => startRecording());
 window.openDictate.onStopRecording(() => stopRecordingAndTranscribe());
 window.openDictate.onStateChange((state) => updateRecordingState(state));
 
+// Gemini settings
+saveGeminiBtn.addEventListener('click', async () => {
+  saveGeminiBtn.setAttribute('disabled', '');
+  const result = await window.openDictate.saveSettings({
+    geminiApiKey: geminiApiKeyInput.value.trim(),
+    geminiModel: geminiModelInput.value.trim() || 'gemini-2.5-flash',
+    systemPrompt: geminiSystemPromptInput.value.trim(),
+  });
+  saveGeminiBtn.removeAttribute('disabled');
+
+  if (result.success) {
+    geminiStatus.textContent = 'Gemini settings saved!';
+    geminiStatus.className = 'settings-msg success';
+  } else {
+    geminiStatus.textContent = result.error ?? 'Failed to save';
+    geminiStatus.className = 'settings-msg error';
+  }
+});
+
 // ── Init ──
 (async () => {
   await refreshConfig();
   await refreshNotesList();
+  await loadSettingsUI();
 })();

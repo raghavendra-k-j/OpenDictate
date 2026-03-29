@@ -10,8 +10,8 @@ contextBridge.exposeInMainWorld('openDictate', {
     ipcRenderer.invoke('config:clear'),
 
   // Transcription
-  sendAudio: (audioBuffer: ArrayBuffer, durationMs: number, noteId: number) =>
-    ipcRenderer.invoke('dictation:transcribe', audioBuffer, durationMs, noteId),
+  sendAudio: (audioBuffer: ArrayBuffer, durationMs: number) =>
+    ipcRenderer.invoke('dictation:transcribe', audioBuffer, durationMs),
   onStartRecording: (callback: () => void) => {
     ipcRenderer.on('dictation:start', () => callback());
   },
@@ -31,14 +31,14 @@ contextBridge.exposeInMainWorld('openDictate', {
     ipcRenderer.invoke('notes:get', id),
   updateNoteTitle: (id: number, title: string) =>
     ipcRenderer.invoke('notes:updateTitle', id, title),
+  updateNoteContent: (id: number, content: string) =>
+    ipcRenderer.invoke('notes:updateContent', id, content),
   deleteNote: (id: number) =>
     ipcRenderer.invoke('notes:delete', id),
 
-  // Entries CRUD
-  getEntries: (noteId: number) =>
-    ipcRenderer.invoke('entries:getAll', noteId),
-  updateEntry: (id: number, content: string) =>
-    ipcRenderer.invoke('entries:update', id, content),
-  deleteEntry: (id: number) =>
-    ipcRenderer.invoke('entries:delete', id),
+  // Settings
+  getSettings: () =>
+    ipcRenderer.invoke('settings:get'),
+  saveSettings: (settings: Record<string, unknown>) =>
+    ipcRenderer.invoke('settings:save', settings),
 });

@@ -6,15 +6,35 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
+import { PublisherGithub } from '@electron-forge/publisher-github';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    name: 'OpenDictate',
+    executableName: 'OpenDictate',
+    appVersion: '1.0.0',
+    appCopyright: 'Copyright © 2026 Raghavendra K J',
   },
   rebuildConfig: {},
+  publishers: [
+    new PublisherGithub({
+      repository: {
+        owner: 'raghavendra-k-j',
+        name: 'OpenDictate',
+      },
+      prerelease: false,
+      draft: true,
+    }),
+  ],
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      name: 'OpenDictate',
+      setupExe: 'OpenDictate-Setup.exe',
+      setupDescription: 'OpenDictate – Open source desktop dictation app',
+      authors: 'Raghavendra K J',
+    }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({}),
@@ -36,11 +56,20 @@ const config: ForgeConfig = {
           config: 'vite.preload.config.ts',
           target: 'preload',
         },
+        {
+          entry: 'src/overlay-preload.ts',
+          config: 'vite.preload.config.ts',
+          target: 'preload',
+        },
       ],
       renderer: [
         {
           name: 'main_window',
           config: 'vite.renderer.config.ts',
+        },
+        {
+          name: 'overlay_window',
+          config: 'vite.overlay.config.ts',
         },
       ],
     }),
