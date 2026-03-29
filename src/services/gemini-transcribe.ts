@@ -7,6 +7,13 @@ export async function transcribeGemini(
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${apiKey}`;
 
+  // === TEMP DEBUG LOGGING ===
+  console.log('[DEBUG][gemini-transcribe] REQUEST:', {
+    url: url.replace(apiKey, apiKey.slice(0, 6) + '...'),
+    method: 'POST',
+    audioSize: base64Audio.length,
+  });
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -29,12 +36,19 @@ export async function transcribeGemini(
     }),
   });
 
+  // === TEMP DEBUG LOGGING ===
+  const responseBody = await response.text();
+  console.log('[DEBUG][gemini-transcribe] RESPONSE:', {
+    status: response.status,
+    statusText: response.statusText,
+    body: responseBody.slice(0, 1000),
+  });
+
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`Gemini transcription failed (${response.status}): ${body.slice(0, 200)}`);
+    throw new Error(`Gemini transcription failed (${response.status}): ${responseBody.slice(0, 200)}`);
   }
 
-  const result = await response.json() as {
+  const result = JSON.parse(responseBody) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
   };
 

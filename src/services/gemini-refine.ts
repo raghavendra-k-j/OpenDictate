@@ -5,27 +5,45 @@ export async function refineText(
   model: string,
   systemPrompt: string
 ): Promise<string> {
+  const requestBody = {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: text },
+    ],
+  };
+
+  // === TEMP DEBUG LOGGING ===
+  console.log('[DEBUG][gemini-refine] REQUEST:', {
+    url: apiUrl,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey.slice(0, 6)}...` },
+    body: requestBody,
+  });
+
   const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: text },
-      ],
-    }),
+    body: JSON.stringify(requestBody),
+  });
+
+  // === TEMP DEBUG LOGGING ===
+  const responseBody = await response.text();
+  console.log('[DEBUG][gemini-refine] RESPONSE:', {
+    status: response.status,
+    statusText: response.statusText,
+    headers: Object.fromEntries(response.headers.entries()),
+    body: responseBody.slice(0, 1000),
   });
 
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`AI refinement failed (${response.status}): ${body.slice(0, 200)}`);
+    throw new Error(`AI refinement failed (${response.status}): ${responseBody.slice(0, 200)}`);
   }
 
-  const result = await response.json() as { choices?: { message?: { content?: string } }[] };
+  const result = JSON.parse(responseBody) as { choices?: { message?: { content?: string } }[] };
   const refined = result.choices?.[0]?.message?.content?.trim();
   return refined || text;
 }

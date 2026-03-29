@@ -23,21 +23,36 @@ export async function transcribe(
     headers['cookie'] = config.cookies;
   }
 
+  // === TEMP DEBUG LOGGING ===
+  console.log('[DEBUG][transcription] REQUEST:', {
+    url: config.url,
+    method: 'POST',
+    headers: Object.keys(headers),
+    hasCookies: !!config.cookies,
+  });
+
   const response = await fetch(config.url, {
     method: 'POST',
     headers,
     body: formData,
   });
 
+  // === TEMP DEBUG LOGGING ===
+  const responseBody = await response.text();
+  console.log('[DEBUG][transcription] RESPONSE:', {
+    status: response.status,
+    statusText: response.statusText,
+    body: responseBody.slice(0, 1000),
+  });
+
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
     if (response.status === 401 || response.status === 403) {
       throw new Error('Session expired. Please paste a fresh cURL command.');
     }
-    throw new Error(`Transcription failed (${response.status}): ${body.slice(0, 200)}`);
+    throw new Error(`Transcription failed (${response.status}): ${responseBody.slice(0, 200)}`);
   }
 
-  const result = await response.json() as Record<string, unknown>;
+  const result = JSON.parse(responseBody) as Record<string, unknown>;
   const text = (result.text ?? result.transcript ?? '') as string;
 
   if (!text) {

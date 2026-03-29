@@ -14,18 +14,33 @@ export async function transcribeWhisper(
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
+  // === TEMP DEBUG LOGGING ===
+  console.log('[DEBUG][whisper-api] REQUEST:', {
+    url: apiUrl,
+    method: 'POST',
+    model,
+    hasApiKey: !!apiKey,
+  });
+
   const response = await fetch(apiUrl, {
     method: 'POST',
     headers,
     body: formData,
   });
 
+  // === TEMP DEBUG LOGGING ===
+  const responseBody = await response.text();
+  console.log('[DEBUG][whisper-api] RESPONSE:', {
+    status: response.status,
+    statusText: response.statusText,
+    body: responseBody.slice(0, 1000),
+  });
+
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`Whisper API failed (${response.status}): ${body.slice(0, 200)}`);
+    throw new Error(`Whisper API failed (${response.status}): ${responseBody.slice(0, 200)}`);
   }
 
-  const result = await response.json() as { text?: string };
+  const result = JSON.parse(responseBody) as { text?: string };
   const text = result.text?.trim();
 
   if (!text) {
