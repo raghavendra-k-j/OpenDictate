@@ -4,6 +4,8 @@ export interface ParsedCurl {
   cookies: string;
 }
 
+export type TranscriptionProvider = 'web-speech' | 'curl' | 'whisper-api' | 'gemini' | 'windows-speech';
+
 export interface TranscriptionResult {
   success: boolean;
   text?: string;
@@ -12,19 +14,23 @@ export interface TranscriptionResult {
   detail?: string;
 }
 
-export interface Note {
-  id: number;
-  title: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-}
+export type OverlayPosition =
+  | 'top-left' | 'top-center' | 'top-right'
+  | 'center-left' | 'center' | 'center-right'
+  | 'bottom-left' | 'bottom-center' | 'bottom-right';
 
 export interface AppSettings {
   shortcut: string;
-  overlayCorner: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'bottom-center';
+  overlayPosition: OverlayPosition;
+  transcriptionProvider: TranscriptionProvider;
+  whisperApiUrl: string;
+  whisperApiKey: string;
+  whisperModel: string;
   geminiApiKey: string;
   geminiModel: string;
+  aiApiKey: string;
+  aiApiUrl: string;
+  aiModel: string;
   systemPrompt: string;
 }
 
@@ -32,12 +38,16 @@ export type OverlayMode = 'transcribe' | 'transcribe-refine';
 
 export interface OverlayAPI {
   sendAudio(audioBuffer: ArrayBuffer, durationMs: number, mode: OverlayMode): Promise<TranscriptionResult>;
+  sendText(text: string, mode: OverlayMode): Promise<TranscriptionResult>;
   closeOverlay(): void;
   onAutoStart(callback: () => void): void;
   onStop(callback: () => void): void;
   startDrag(): void;
   stopDrag(): void;
-  getGeminiStatus(): Promise<{ configured: boolean }>;
+  getAiStatus(): Promise<{ configured: boolean }>;
+  getActiveProvider(): Promise<{ provider: TranscriptionProvider }>;
+  startWindowsSpeech(): Promise<void>;
+  stopWindowsSpeech(): Promise<string>;
   copyToClipboard(text: string): void;
   resizeOverlay(height: number): void;
 }
@@ -48,23 +58,12 @@ export interface OpenDictateAPI {
   loadConfig(): Promise<{ configured: boolean; url?: string }>;
   clearConfig(): Promise<void>;
 
-  // Transcription
-  sendAudio(audioBuffer: ArrayBuffer, durationMs: number): Promise<TranscriptionResult>;
-  onStartRecording(callback: () => void): void;
-  onStopRecording(callback: () => void): void;
-  onStateChange(callback: (state: string) => void): void;
-
   // Settings
   getSettings(): Promise<AppSettings>;
   saveSettings(settings: Partial<AppSettings>): Promise<{ success: boolean; shortcut: string; error?: string }>;
 
-  // Notes CRUD
-  createNote(title: string): Promise<Note>;
-  getAllNotes(): Promise<Note[]>;
-  getNote(id: number): Promise<Note | null>;
-  updateNoteTitle(id: number, title: string): Promise<void>;
-  updateNoteContent(id: number, content: string): Promise<void>;
-  deleteNote(id: number): Promise<void>;
+  // Overlay
+  toggleOverlay(): Promise<void>;
 }
 
 declare global {

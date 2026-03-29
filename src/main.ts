@@ -4,11 +4,13 @@ import started from 'electron-squirrel-startup';
 import { parseCurl } from './services/curl-parser';
 import { saveConfig, loadConfig, clearConfig } from './services/config-store';
 import { transcribe } from './services/transcription';
+import { transcribeWhisper } from './services/whisper-api';
+import { transcribeGemini } from './services/gemini-transcribe';
 import { insertText } from './services/text-inserter';
 import { createTrayIcon } from './utils/tray-icons';
 import { loadSettings, saveSettings as persistSettings } from './services/settings-store';
 import { refineText } from './services/gemini-refine';
-import * as db from './services/database';
+import { startWindowsSpeech, stopWindowsSpeech } from './services/windows-speech';
 
 if (started) {
   app.quit();
@@ -75,12 +77,16 @@ function positionOverlay() {
   const oh = 52;
 
   let x: number, y: number;
-  switch (settings.overlayCorner) {
-    case 'top-left': x = sx + margin; y = sy + margin; break;
-    case 'top-right': x = sx + width - ow - margin; y = sy + margin; break;
-    case 'bottom-left': x = sx + margin; y = sy + height - oh - margin; break;
-    case 'bottom-center': x = sx + Math.round((width - ow) / 2); y = sy + height - oh - margin; break;
-    case 'bottom-right': default: x = sx + width - ow - margin; y = sy + height - oh - margin; break;
+  switch (settings.overlayPosition) {
+    case 'top-left':      x = sx + margin;                          y = sy + margin; break;
+    case 'top-center':    x = sx + Math.round((width - ow) / 2);   y = sy + margin; break;
+    case 'top-right':     x = sx + width - ow - margin;            y = sy + margin; break;
+    case 'center-left':   x = sx + margin;                          y = sy + Math.round((height - oh) / 2); break;
+    case 'center':        x = sx + Math.round((width - ow) / 2);   y = sy + Math.round((height - oh) / 2); break;
+    case 'center-right':  x = sx + width - ow - margin;            y = sy + Math.round((height - oh) / 2); break;
+    case 'bottom-left':   x = sx + margin;                          y = sy + height - oh - margin; break;
+    case 'bottom-center': x = sx + Math.round((width - ow) / 2);   y = sy + height - oh - margin; break;
+    case 'bottom-right': default: x = sx + width - ow - margin;    y = sy + height - oh - margin; break;
   }
   overlayWindow.setPosition(Math.round(x), Math.round(y));
 }
@@ -113,7 +119,19 @@ function registerShortcut(accelerator: string): boolean {
 }
 
 function handleShortcut() {
-  if (!loadConfig()) {
+  const settings = loadSettings();
+  const provider = settings.transcriptionProvider;
+
+  // For cURL provider, require config; for others, check their own config
+  if (provider === 'curl' && !loadConfig()) {
+    mainWindow?.show();
+    return;
+  }
+  if (provider === 'whisper-api' && !settings.whisperApiKey && !settings.whisperApiUrl.includes('localhost')) {
+    mainWindow?.show();
+    return;
+  }
+  if (provider === 'gemini' && !settings.geminiApiKey) {
     mainWindow?.show();
     return;
   }
@@ -154,9 +172,9 @@ function createTray() {
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
-    width: 960,
-    height: 700,
-    minWidth: 760,
+    width: 560,
+    height: 620,
+    minWidth: 480,
     minHeight: 500,
     resizable: true,
     webPreferences: {
@@ -195,32 +213,13 @@ ipcMain.handle('config:save', async (_event, curlString: string) => {
 ipcMain.handle('config:load', async () => {
   const config = loadConfig();
   if (config) {
-    return { configured: true, url: config.url };
+    return { configured: true, url: config.url, headers: config.headers, cookies: config.cookies };
   }
   return { configured: false };
 });
 
 ipcMain.handle('config:clear', async () => {
   clearConfig();
-});
-
-// ── Transcription IPC ──
-ipcMain.handle('dictation:transcribe', async (_event, audioBuffer: ArrayBuffer, durationMs: number) => {
-  try {
-    const config = loadConfig();
-    if (!config) {
-      throw new Error('Not configured. Paste a cURL command first.');
-    }
-
-    const text = await transcribe(Buffer.from(audioBuffer), durationMs, config);
-
-    return { success: true, text };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Transcription failed';
-    return { success: false, error: message };
-  } finally {
-    updateState('idle');
-  }
 });
 
 // ── Overlay IPC ──
@@ -259,8 +258,8 @@ function classifyError(err: unknown): { message: string; code: string; detail: s
   if (msg.includes('No transcription text') || msg.toLowerCase().includes('no speech')) {
     return { message: 'No speech detected', code: 'no-text', detail };
   }
-  if (msg.toLowerCase().includes('gemini') || msg.toLowerCase().includes('googlegenai') || msg.includes('Gemini API key')) {
-    return { message: 'AI refinement failed', code: 'gemini-error', detail };
+  if (msg.toLowerCase().includes('ai refinement') || msg.toLowerCase().includes('api key')) {
+    return { message: 'AI refinement failed', code: 'ai-error', detail };
   }
   if (msg.includes('Not configured')) {
     return { message: 'Not configured — open settings', code: 'not-configured', detail };
@@ -277,21 +276,60 @@ function classifyError(err: unknown): { message: string; code: string; detail: s
 
 ipcMain.handle('overlay:transcribe', async (_event, audioBuffer: ArrayBuffer, durationMs: number, mode: string) => {
   try {
-    const config = loadConfig();
-    if (!config) throw new Error('Not configured. Paste a cURL command first.');
+    const settings = loadSettings();
+    let text: string;
 
-    let text = await transcribe(Buffer.from(audioBuffer), durationMs, config);
+    switch (settings.transcriptionProvider) {
+      case 'curl': {
+        const config = loadConfig();
+        if (!config) throw new Error('Not configured. Paste a cURL command first.');
+        text = await transcribe(Buffer.from(audioBuffer), durationMs, config);
+        break;
+      }
+      case 'whisper-api': {
+        if (!settings.whisperApiUrl) throw new Error('Whisper API URL not configured.');
+        text = await transcribeWhisper(Buffer.from(audioBuffer), settings.whisperApiUrl, settings.whisperApiKey, settings.whisperModel);
+        break;
+      }
+      case 'gemini': {
+        if (!settings.geminiApiKey) throw new Error('Gemini API key not configured.');
+        text = await transcribeGemini(Buffer.from(audioBuffer), settings.geminiApiKey, settings.geminiModel);
+        break;
+      }
+      default:
+        throw new Error(`Unknown provider: ${settings.transcriptionProvider}`);
+    }
 
     if (mode === 'transcribe-refine') {
-      const settings = loadSettings();
-      if (!settings.geminiApiKey) throw new Error('Gemini API key not configured.');
-      text = await refineText(text, settings.geminiApiKey, settings.geminiModel, settings.systemPrompt);
+      if (!settings.aiApiKey) throw new Error('AI API key not configured.');
+      text = await refineText(text, settings.aiApiKey, settings.aiApiUrl, settings.aiModel, settings.systemPrompt);
     }
 
     await insertText(text);
 
     updateState('idle');
     return { success: true, text };
+  } catch (err: unknown) {
+    updateState('idle');
+    const { message, code, detail } = classifyError(err);
+    return { success: false, error: message, errorCode: code, detail };
+  }
+});
+
+ipcMain.handle('overlay:transcribe-text', async (_event, text: string, mode: string) => {
+  try {
+    let result = text;
+
+    if (mode === 'transcribe-refine') {
+      const settings = loadSettings();
+      if (!settings.aiApiKey) throw new Error('AI API key not configured.');
+      result = await refineText(result, settings.aiApiKey, settings.aiApiUrl, settings.aiModel, settings.systemPrompt);
+    }
+
+    await insertText(result);
+
+    updateState('idle');
+    return { success: true, text: result };
   } catch (err: unknown) {
     updateState('idle');
     const { message, code, detail } = classifyError(err);
@@ -333,9 +371,26 @@ ipcMain.on('overlay:drag-end', () => {
   if (dragInterval) { clearInterval(dragInterval); dragInterval = null; }
 });
 
-ipcMain.handle('settings:gemini-status', async () => {
+ipcMain.handle('settings:ai-status', async () => {
   const settings = loadSettings();
-  return { configured: !!settings.geminiApiKey };
+  return { configured: !!settings.aiApiKey };
+});
+
+ipcMain.handle('settings:active-provider', async () => {
+  const settings = loadSettings();
+  return { provider: settings.transcriptionProvider };
+});
+
+ipcMain.handle('overlay:toggle', async () => {
+  handleShortcut();
+});
+
+ipcMain.handle('overlay:start-windows-speech', async () => {
+  startWindowsSpeech();
+});
+
+ipcMain.handle('overlay:stop-windows-speech', async () => {
+  return stopWindowsSpeech();
 });
 
 // ── Settings IPC ──
@@ -360,31 +415,6 @@ ipcMain.handle('settings:save', async (_event, newSettings: Record<string, unkno
   return { success: true, shortcut: updated.shortcut };
 });
 
-// ── Notes IPC ──
-ipcMain.handle('notes:create', async (_event, title: string) => {
-  return db.createNote(title);
-});
-
-ipcMain.handle('notes:getAll', async () => {
-  return db.getAllNotes();
-});
-
-ipcMain.handle('notes:get', async (_event, id: number) => {
-  return db.getNote(id) ?? null;
-});
-
-ipcMain.handle('notes:updateTitle', async (_event, id: number, title: string) => {
-  db.updateNoteTitle(id, title);
-});
-
-ipcMain.handle('notes:updateContent', async (_event, id: number, content: string) => {
-  db.updateNoteContent(id, content);
-});
-
-ipcMain.handle('notes:delete', async (_event, id: number) => {
-  db.deleteNote(id);
-});
-
 // ── App lifecycle ──
 app.on('ready', () => {
   createWindow();
@@ -399,7 +429,6 @@ app.on('ready', () => {
 
 app.on('before-quit', () => {
   (app as Electron.App & { isQuitting: boolean }).isQuitting = true;
-  db.closeDb();
 });
 
 app.on('will-quit', () => {

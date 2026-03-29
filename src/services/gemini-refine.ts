@@ -1,18 +1,31 @@
-import { GoogleGenAI } from '@google/genai';
-
 export async function refineText(
   text: string,
   apiKey: string,
+  apiUrl: string,
   model: string,
   systemPrompt: string
 ): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model,
-    contents: text,
-    config: {
-      systemInstruction: systemPrompt,
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
     },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: text },
+      ],
+    }),
   });
-  return response.text?.trim() || text;
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`AI refinement failed (${response.status}): ${body.slice(0, 200)}`);
+  }
+
+  const result = await response.json() as { choices?: { message?: { content?: string } }[] };
+  const refined = result.choices?.[0]?.message?.content?.trim();
+  return refined || text;
 }

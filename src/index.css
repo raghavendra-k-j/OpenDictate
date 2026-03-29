@@ -57,7 +57,6 @@
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', Helvetica, Arial, sans-serif;
   --font-mono: 'SFMono-Medium', 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', 'Ubuntu Mono', Menlo, Consolas, Courier, monospace;
 
-  --sidebar-width: 260px;
 }
 
 /* ── Reset ── */
@@ -70,7 +69,7 @@ body {
   font-size: 14px;
   line-height: 1.42857;
   color: var(--N800);
-  background: var(--N20);
+  background: var(--N0);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -80,103 +79,85 @@ body {
   height: 100vh;
 }
 
-/* ── Sidebar ── */
-#sidebar {
-  width: var(--sidebar-width);
-  min-width: var(--sidebar-width);
-  background: var(--N0);
-  border-right: 1px solid var(--N30);
+/* ── Settings Page ── */
+.settings-page {
+  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.sidebar-header {
+.settings-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 20px 16px 12px;
-  color: var(--B400);
+  padding: 20px 24px 16px;
+  background: var(--N0);
+  border-bottom: 1px solid var(--N30);
+  flex-shrink: 0;
 }
 
-.logo-icon { display: flex; }
-.logo-text { font-size: 15px; font-weight: 600; color: var(--N800); }
+.settings-header .logo-icon { display: flex; color: var(--B400); }
+.settings-header .logo-text { font-size: 16px; font-weight: 600; color: var(--N800); }
+.settings-header .config-badge { margin-left: auto; }
 
-.btn-new-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 12px 8px;
-  padding: 8px 12px;
-  background: var(--B400);
-  color: var(--N0);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.1s;
-}
-.btn-new-note:hover { background: var(--B300); }
-
-.notes-list {
+.settings-body {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 8px;
+  padding: 0 24px 32px;
 }
 
-.note-item {
+/* ── Tabs ── */
+.tab-bar {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  color: var(--N500);
-  font-size: 13px;
-  transition: background 0.1s;
+  gap: 0;
+  border-bottom: 2px solid var(--N30);
+  padding: 16px 0 0;
+  margin-bottom: 20px;
+  position: sticky;
+  top: 0;
+  background: var(--N0);
+  z-index: 1;
+}
+
+.tab-btn {
+  padding: 8px 16px;
   border: none;
   background: none;
-  width: 100%;
-  text-align: left;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--N200);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: var(--N800); }
+.tab-btn.active {
+  color: var(--B400);
+  border-bottom-color: var(--B400);
+  font-weight: 600;
 }
 
-.note-item:hover { background: var(--N20); }
-.note-item.active { background: var(--B50); color: var(--B400); font-weight: 500; }
+.tab-panel {
+  display: none;
+}
+.tab-panel.active {
+  display: block;
+}
 
-.note-item-icon {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+.settings-section {
+  margin-bottom: 0;
+}
+
+.section-actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--N80);
-}
-
-.note-item.active .note-item-icon { color: var(--B400); }
-
-.note-item-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.note-item-time {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--N80);
-  white-space: nowrap;
-}
-
-.sidebar-footer {
-  padding: 12px;
-  border-top: 1px solid var(--N30);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 8px;
+  margin-top: 12px;
 }
+
+
 
 .config-badge {
   display: flex;
@@ -196,228 +177,7 @@ body {
 .config-badge.connected .config-dot { background: var(--G300); }
 .config-badge.connected { color: var(--G400); }
 
-.btn-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--N200);
-  cursor: pointer;
-  transition: background 0.1s, color 0.1s;
-}
-.btn-icon:hover { background: var(--N30); color: var(--N800); }
 
-.btn-danger:hover { background: var(--R50); color: var(--R400); }
-
-/* ── Main Panel ── */
-#main-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* ── Empty State ── */
-.empty-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--N200);
-}
-
-.empty-icon { color: var(--N50); }
-
-.empty-state h2 {
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--N800);
-}
-
-.empty-state p {
-  font-size: 14px;
-  color: var(--N200);
-}
-
-.empty-state kbd {
-  background: var(--N30);
-  border: 1px solid var(--N40);
-  border-radius: var(--radius-sm);
-  padding: 1px 6px;
-  font-family: var(--font);
-  font-size: 12px;
-  color: var(--N500);
-}
-
-/* ── Note View ── */
-.note-view {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.note-header {
-  display: flex;
-  align-items: center;
-  padding: 16px 24px;
-  background: var(--N0);
-  border-bottom: 1px solid var(--N30);
-  gap: 12px;
-}
-
-.note-title-input {
-  flex: 1;
-  border: none;
-  background: none;
-  font-family: var(--font);
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--N900);
-  outline: none;
-}
-
-.note-title-input::placeholder { color: var(--N60); }
-
-.note-title-input:focus {
-  box-shadow: inset 0 -2px 0 0 var(--B200);
-}
-
-.note-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.btn-record {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background: var(--B400);
-  color: var(--N0);
-  cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s;
-}
-.btn-record:hover { background: var(--B300); }
-.btn-record.recording {
-  background: var(--R300);
-  animation: pulse-rec 1.5s ease-in-out infinite;
-}
-.btn-record.processing {
-  background: var(--Y200);
-  color: var(--N800);
-  cursor: wait;
-}
-
-@keyframes pulse-rec {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255,86,48,0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(255,86,48,0); }
-}
-
-.rec-indicator {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  background: var(--R50);
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--R400);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.rec-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--R300);
-  animation: blink 0.8s ease-in-out infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.2; }
-}
-
-/* ── Note Content Textarea ── */
-.note-content {
-  flex: 1;
-  width: 100%;
-  padding: 24px;
-  border: none;
-  background: var(--N0);
-  font-family: var(--font);
-  font-size: 14px;
-  line-height: 1.8;
-  color: var(--N800);
-  resize: none;
-  outline: none;
-  overflow-y: auto;
-}
-
-.note-content::placeholder { color: var(--N60); }
-
-/* ── Note Status Bar ── */
-.note-status {
-  padding: 6px 24px;
-  background: var(--N0);
-  border-top: 1px solid var(--N30);
-  font-size: 11px;
-  color: var(--N100);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* ── Settings Modal ── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(9, 30, 66, 0.54);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.modal {
-  background: var(--N0);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  width: 520px;
-  max-width: 90vw;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px 0;
-}
-
-.modal-header h2 {
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--N800);
-}
-
-.modal-body {
-  padding: 16px 24px 24px;
-}
 
 .field-label {
   display: block;
@@ -459,12 +219,6 @@ body {
   transition: border-color 0.1s;
 }
 #curl-input:focus { border-color: var(--B200); }
-
-.modal-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
 
 .btn-primary {
   padding: 8px 16px;

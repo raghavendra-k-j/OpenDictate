@@ -2,11 +2,25 @@ import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 
+export type OverlayPosition =
+  | 'top-left' | 'top-center' | 'top-right'
+  | 'center-left' | 'center' | 'center-right'
+  | 'bottom-left' | 'bottom-center' | 'bottom-right';
+
+export type TranscriptionProvider = 'web-speech' | 'curl' | 'whisper-api' | 'gemini' | 'windows-speech';
+
 export interface AppSettings {
   shortcut: string;
-  overlayCorner: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'bottom-center';
+  overlayPosition: OverlayPosition;
+  transcriptionProvider: TranscriptionProvider;
+  whisperApiUrl: string;
+  whisperApiKey: string;
+  whisperModel: string;
   geminiApiKey: string;
   geminiModel: string;
+  aiApiKey: string;
+  aiApiUrl: string;
+  aiModel: string;
   systemPrompt: string;
 }
 
@@ -19,9 +33,16 @@ const DEFAULT_SYSTEM_PROMPT = `You are a transcription editor. Clean up the foll
 
 const defaults: AppSettings = {
   shortcut: 'CommandOrControl+Shift+Space',
-  overlayCorner: 'bottom-center',
+  overlayPosition: 'bottom-center',
+  transcriptionProvider: 'web-speech',
+  whisperApiUrl: 'https://api.openai.com/v1/audio/transcriptions',
+  whisperApiKey: '',
+  whisperModel: 'whisper-1',
   geminiApiKey: '',
-  geminiModel: 'gemini-2.5-flash',
+  geminiModel: 'gemini-2.0-flash',
+  aiApiKey: '',
+  aiApiUrl: 'https://api.openai.com/v1/chat/completions',
+  aiModel: 'gpt-4o-mini',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
 };
 

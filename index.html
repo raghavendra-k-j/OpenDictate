@@ -3,140 +3,177 @@
   <head>
     <meta charset="UTF-8" />
     <title>OpenDictate</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; connect-src 'self' https:">
   </head>
   <body>
     <div id="app">
-      <!-- Sidebar -->
-      <aside id="sidebar">
-        <div class="sidebar-header">
+      <div class="settings-page">
+        <div class="settings-header">
           <span class="logo-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
           </span>
           <span class="logo-text">OpenDictate</span>
-        </div>
-
-        <button id="new-note-btn" class="btn-new-note">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New note
-        </button>
-
-        <nav id="notes-list" class="notes-list"></nav>
-
-        <div class="sidebar-footer">
           <div id="config-badge" class="config-badge disconnected">
             <span class="config-dot"></span>
             <span id="config-badge-text">Not connected</span>
           </div>
-          <button id="settings-btn" class="btn-icon" title="Settings">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </button>
-        </div>
-      </aside>
-
-      <!-- Main content -->
-      <main id="main-panel">
-        <!-- Empty state -->
-        <div id="empty-state" class="empty-state">
-          <div class="empty-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-          </div>
-          <h2>Welcome to OpenDictate</h2>
-          <p>Create a new note to start dictating. Press <kbd>Ctrl+Shift+Space</kbd> to record.</p>
         </div>
 
-        <!-- Note view -->
-        <div id="note-view" class="note-view" style="display:none">
-          <header class="note-header">
-            <input id="note-title" class="note-title-input" type="text" placeholder="Untitled note" spellcheck="false" />
-            <div class="note-actions">
-              <span id="recording-indicator" class="rec-indicator" style="display:none">
-                <span class="rec-dot"></span>
-                <span class="rec-label">REC</span>
-              </span>
-              <button id="record-btn" class="btn-record" title="Start recording (Ctrl+Shift+Space)">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-              </button>
-              <button id="copy-note-btn" class="btn-icon" title="Copy all text">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              </button>
-              <button id="delete-note-btn" class="btn-icon btn-danger" title="Delete note">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              </button>
-            </div>
-          </header>
-
-          <textarea id="note-content" class="note-content" placeholder="Start typing or dictate with the mic button..." spellcheck="true"></textarea>
-
-          <div id="note-status" class="note-status">
-            <span id="save-status">All changes saved</span>
+        <div class="settings-body">
+          <!-- Tab bar -->
+          <div class="tab-bar">
+            <button class="tab-btn active" data-tab="transcription">Transcription</button>
+            <button class="tab-btn" data-tab="overlay">Overlay</button>
+            <button class="tab-btn" data-tab="ai">AI Refinement</button>
           </div>
-        </div>
-      </main>
 
-      <!-- Settings modal -->
-      <div id="settings-modal" class="modal-overlay" style="display:none">
-        <div class="modal">
-          <div class="modal-header">
-            <h2>Settings</h2>
-            <button id="close-settings" class="btn-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-          <div class="modal-body">
-            <label class="field-label">Transcription cURL</label>
-            <p class="field-hint">
-              Open ChatGPT &rarr; F12 &rarr; Network tab &rarr; make a voice recording &rarr;
-              right-click the <code>transcribe</code> request &rarr; <strong>Copy as cURL</strong>.
-            </p>
-            <textarea id="curl-input" rows="5" placeholder="Paste cURL command here..." spellcheck="false"></textarea>
-            <div class="modal-actions">
-              <button id="save-curl-btn" class="btn-primary">Save</button>
-              <button id="clear-curl-btn" class="btn-subtle">Clear config</button>
-            </div>
-            <div id="settings-status" class="settings-msg"></div>
+          <!-- ═══════ Transcription Tab ═══════ -->
+          <div class="tab-panel active" id="tab-transcription">
+            <section class="settings-section">
+              <label class="field-label">Active Provider</label>
+              <select id="provider-select" class="select-input">
+                <option value="windows-speech">Windows Speech (Local / Offline)</option>
+                <option value="web-speech">Web Speech (Browser built-in)</option>
+                <option value="curl">ChatGPT cURL</option>
+                <option value="whisper-api">Whisper API (OpenAI / Ollama)</option>
+                <option value="gemini">Gemini</option>
+              </select>
+            </section>
 
             <div class="settings-divider"></div>
 
-            <label class="field-label">Global Shortcut</label>
-            <p class="field-hint">Click the input and press your desired key combination for the overlay dictation shortcut.</p>
-            <div class="shortcut-recorder">
-              <input id="shortcut-input" class="shortcut-input" type="text" readonly placeholder="Press a key combination..." />
-              <button id="save-shortcut-btn" class="btn-primary">Save</button>
-            </div>
-
-            <label class="field-label" style="margin-top: 16px;">Overlay Position</label>
-            <select id="overlay-corner" class="select-input">
-              <option value="bottom-center">Bottom Center</option>
-              <option value="bottom-right">Bottom Right</option>
-              <option value="bottom-left">Bottom Left</option>
-              <option value="top-right">Top Right</option>
-              <option value="top-left">Top Left</option>
-            </select>
-
-            <div id="shortcut-status" class="settings-msg"></div>
+            <!-- Windows Speech -->
+            <section class="settings-section">
+              <label class="field-label">Windows Speech (Local)</label>
+              <p class="field-hint">
+                Uses Microsoft's built-in SAPI speech engine (same models as Win+H). Works offline. No configuration needed.
+              </p>
+            </section>
 
             <div class="settings-divider"></div>
 
-            <label class="field-label">AI Refinement (Gemini)</label>
-            <p class="field-hint">
-              Configure a Gemini API key to enable the "Transcribe &amp; Refine" option, which cleans up filler words, fixes grammar, and formats your dictation.
-              Get a free API key at <code>aistudio.google.com</code>.
-            </p>
+            <!-- ChatGPT cURL -->
+            <section class="settings-section">
+              <label class="field-label">ChatGPT cURL</label>
+              <p class="field-hint">
+                Open ChatGPT &rarr; F12 &rarr; Network tab &rarr; make a voice recording &rarr;
+                right-click the <code>transcribe</code> request &rarr; <strong>Copy as cURL</strong>.
+              </p>
+              <textarea id="curl-input" rows="4" placeholder="Paste cURL command here..." spellcheck="false"></textarea>
+              <div class="section-actions">
+                <button id="save-curl-btn" class="btn-primary">Save</button>
+                <button id="clear-curl-btn" class="btn-subtle">Clear config</button>
+              </div>
+              <div id="settings-status" class="settings-msg"></div>
+            </section>
 
-            <label class="field-label-sm">API Key</label>
-            <input id="gemini-api-key" type="password" class="text-input" placeholder="Enter Gemini API key..." spellcheck="false" autocomplete="off" />
+            <div class="settings-divider"></div>
 
-            <label class="field-label-sm">Model</label>
-            <input id="gemini-model" type="text" class="text-input" placeholder="gemini-2.5-flash" spellcheck="false" />
+            <!-- Whisper API -->
+            <section class="settings-section">
+              <label class="field-label">Whisper API (OpenAI / Ollama)</label>
+              <p class="field-hint">
+                Works with OpenAI Whisper, Ollama, faster-whisper-server, or any OpenAI-compatible
+                <code>/v1/audio/transcriptions</code> endpoint.
+              </p>
+              <label class="field-label-sm">API URL</label>
+              <input id="whisper-api-url" type="text" class="text-input" placeholder="https://api.openai.com/v1/audio/transcriptions" spellcheck="false" />
+              <p class="field-hint" style="margin-top: 2px;">
+                For Ollama: <code>http://localhost:11434/v1/audio/transcriptions</code>
+              </p>
+              <label class="field-label-sm">API Key</label>
+              <input id="whisper-api-key" type="text" class="text-input" placeholder="Enter API key (empty for local)" spellcheck="false" autocomplete="off" />
+              <label class="field-label-sm">Model</label>
+              <input id="whisper-model" type="text" class="text-input" placeholder="whisper-1" spellcheck="false" />
+              <div class="section-actions">
+                <button id="save-whisper-btn" class="btn-primary">Save</button>
+              </div>
+              <div id="whisper-status" class="settings-msg"></div>
+            </section>
 
-            <label class="field-label-sm">System Prompt</label>
-            <textarea id="gemini-system-prompt" rows="5" class="text-input" placeholder="Instructions for how Gemini should clean up the text..." spellcheck="false"></textarea>
+            <div class="settings-divider"></div>
 
-            <div class="modal-actions">
-              <button id="save-gemini-btn" class="btn-primary">Save Gemini Settings</button>
-            </div>
-            <div id="gemini-status" class="settings-msg"></div>
+            <!-- Gemini -->
+            <section class="settings-section">
+              <label class="field-label">Gemini</label>
+              <p class="field-hint">
+                Uses Gemini's native audio understanding to transcribe your dictation.
+              </p>
+              <label class="field-label-sm">API Key</label>
+              <input id="gemini-api-key" type="text" class="text-input" placeholder="Enter Gemini API key..." spellcheck="false" autocomplete="off" />
+              <label class="field-label-sm">Model</label>
+              <input id="gemini-model" type="text" class="text-input" placeholder="gemini-2.0-flash" spellcheck="false" />
+              <div class="section-actions">
+                <button id="save-gemini-btn" class="btn-primary">Save</button>
+              </div>
+              <div id="gemini-status" class="settings-msg"></div>
+            </section>
+          </div>
+
+          <!-- ═══════ Overlay Tab ═══════ -->
+          <div class="tab-panel" id="tab-overlay">
+            <section class="settings-section">
+              <label class="field-label">Global Shortcut</label>
+              <p class="field-hint">Click the input and press your desired key combination for the overlay dictation shortcut.</p>
+              <div class="shortcut-recorder">
+                <input id="shortcut-input" class="shortcut-input" type="text" readonly placeholder="Press a key combination..." />
+              </div>
+            </section>
+
+            <div class="settings-divider"></div>
+
+            <section class="settings-section">
+              <label class="field-label">Overlay Position</label>
+              <select id="overlay-position" class="select-input">
+                <option value="top-left">Top Left</option>
+                <option value="top-center">Top Center</option>
+                <option value="top-right">Top Right</option>
+                <option value="center-left">Center Left</option>
+                <option value="center">Center</option>
+                <option value="center-right">Center Right</option>
+                <option value="bottom-left">Bottom Left</option>
+                <option value="bottom-center">Bottom Center</option>
+                <option value="bottom-right">Bottom Right</option>
+              </select>
+            </section>
+
+            <div class="settings-divider"></div>
+
+            <section class="settings-section">
+              <div class="section-actions">
+                <button id="save-shortcut-btn" class="btn-primary">Save</button>
+                <button id="open-overlay-btn" class="btn-subtle">Test Overlay</button>
+              </div>
+              <div id="shortcut-status" class="settings-msg"></div>
+            </section>
+          </div>
+
+          <!-- ═══════ AI Refinement Tab ═══════ -->
+          <div class="tab-panel" id="tab-ai">
+            <section class="settings-section">
+              <label class="field-label">AI Refinement (OpenAI-compatible)</label>
+              <p class="field-hint">
+                Configure an API key to enable the "Transcribe &amp; Refine" overlay option, which cleans up filler words, fixes grammar, and formats your dictation.
+                Works with OpenAI, Groq, Together, or any OpenAI-compatible API.
+              </p>
+
+              <label class="field-label-sm">API Key</label>
+              <input id="ai-api-key" type="text" class="text-input" placeholder="Enter API key..." spellcheck="false" autocomplete="off" />
+
+              <label class="field-label-sm">API URL</label>
+              <input id="ai-api-url" type="text" class="text-input" placeholder="https://api.openai.com/v1/chat/completions" spellcheck="false" />
+
+              <label class="field-label-sm">Model</label>
+              <input id="ai-model" type="text" class="text-input" placeholder="gpt-4o-mini" spellcheck="false" />
+
+              <label class="field-label-sm">System Prompt</label>
+              <textarea id="ai-system-prompt" rows="4" class="text-input" placeholder="Instructions for how the AI should clean up the text..." spellcheck="false"></textarea>
+
+              <div class="section-actions">
+                <button id="save-ai-btn" class="btn-primary">Save AI Settings</button>
+              </div>
+              <div id="ai-status" class="settings-msg"></div>
+            </section>
           </div>
         </div>
       </div>

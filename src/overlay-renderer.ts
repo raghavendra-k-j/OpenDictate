@@ -1,5 +1,5 @@
 import './overlay.css';
-import type { OverlayMode } from './types';
+import type { OverlayMode, TranscriptionProvider } from './types';
 
 // Lucide-style SVG icons (16×16)
 const MIC_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
@@ -22,7 +22,7 @@ let segmentStart = 0;
 let timerInterval: ReturnType<typeof setInterval> | null = null;
 let currentState: OverlayState = 'idle';
 let isDragging = false;
-let geminiConfigured = false;
+let aiConfigured = false;
 let lastMode: OverlayMode = 'transcribe';
 let lastAudioBuffer: ArrayBuffer | null = null;
 let lastDurationMs = 0;
@@ -33,6 +33,10 @@ let audioContext: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
 let analyserSource: MediaStreamAudioSourceNode | null = null;
 let waveAnimFrame: number | null = null;
+let activeProvider: TranscriptionProvider = 'web-speech';
+let recognition: any = null;
+let finalTranscript = '';
+let audioStream: MediaStream | null = null;
 
 const widget = document.getElementById('overlay-widget')!;
 const micBtn = document.getElementById('mic-btn')!;
@@ -79,7 +83,7 @@ const ERROR_LABELS: Record<string, string> = {
   'auth-failed':    'Auth failed',
   'rate-limited':   'Rate limited',
   'no-text':        'No speech detected',
-  'gemini-error':   'AI error',
+  'ai-error':       'AI error',
   'not-configured': 'Not configured',
   'mic-denied':     'Mic denied',
   'api-error':      'Server error',
@@ -207,7 +211,7 @@ function setState(state: OverlayState) {
       done.innerHTML = CHECK_SVG;
       done.className = 'ctl-btn done-btn';
       refine.innerHTML = SPARKLE_SVG;
-      refine.className = 'ctl-btn refine-btn' + (!geminiConfigured ? ' disabled' : '');
+      refine.className = 'ctl-btn refine-btn' + (!aiConfigured ? ' disabled' : '');
       break;
     case 'paused':
       mic.className = 'ctl-btn paused';
@@ -290,13 +294,81 @@ function stopWaveform() {
 async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus' : 'audio/webm';
+    audioStream = stream;
 
-    mediaRecorder = new MediaRecorder(stream, { mimeType });
-    audioChunks = [];
-    recordingMs = 0;
-    lastAudioBuffer = null;
+    if (activeProvider === 'windows-speech') {
+      // Windows SAPI path — recognition runs in main process via PowerShell
+      await window.overlayAPI.startWindowsSpeech();
+      finalTranscript = '';
+      recordingMs = 0;
+      lastAudioBuffer = null;
+      setState('recording');
+      startTimerTick();
+      startWaveform(stream);
+    } else if (activeProvider === 'web-speech') {
+      // Web Speech API path — no MediaRecorder needed
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        throw new Error('Web Speech API not supported in this environment');
+      }
+      recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      finalTranscript = '';
+
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        // Show interim text in the timer area
+        const timerEl = document.getElementById('timer');
+        if (timerEl) {
+          const display = interim || finalTranscript;
+          timerEl.textContent = display ? display.slice(-20) : '0:00';
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error === 'no-speech') return; // Ignore no-speech, keep listening
+        if (event.error === 'network' && currentState === 'recording') {
+          // Transient network error — retry automatically
+          try { recognition.start(); } catch { /* ignore */ }
+          return;
+        }
+        lastErrorMessage = `Speech recognition error: ${event.error}`;
+        lastErrorCode = event.error === 'not-allowed' ? 'mic-denied' : 'unknown';
+        lastErrorDetail = `Timestamp: ${new Date().toISOString()}\nMessage: ${lastErrorMessage}`;
+        setState('error');
+      };
+
+      recognition.onend = () => {
+        // Restart if still recording (recognition can stop on silence)
+        if (currentState === 'recording') {
+          try { recognition.start(); } catch { /* ignore */ }
+        }
+      };
+
+      recognition.start();
+      recordingMs = 0;
+      lastAudioBuffer = null;
+      setState('recording');
+      startTimerTick();
+      startWaveform(stream);
+    } else {
+      // MediaRecorder path for cURL, Whisper API, Gemini
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus' : 'audio/webm';
+
+      mediaRecorder = new MediaRecorder(stream, { mimeType });
+      audioChunks = [];
+      recordingMs = 0;
+      lastAudioBuffer = null;
 
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) audioChunks.push(e.data);
@@ -306,6 +378,7 @@ async function startRecording() {
     setState('recording');
     startTimerTick();
     startWaveform(stream);
+    } // end else (MediaRecorder path)
   } catch (err) {
     lastErrorMessage = err instanceof Error ? err.message : 'Microphone access denied';
     lastErrorCode = 'mic-denied';
@@ -317,6 +390,14 @@ async function startRecording() {
 }
 
 function pauseRecording() {
+  if (activeProvider === 'web-speech' || activeProvider === 'windows-speech') {
+    // Web Speech doesn't have a native pause, stop recognition temporarily
+    try { recognition?.stop(); } catch { /* ignore */ }
+    stopTimerTick();
+    setState('paused');
+    if (audioContext && audioContext.state === 'running') audioContext.suspend();
+    return;
+  }
   if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
   mediaRecorder.pause();
   stopTimerTick();
@@ -325,6 +406,13 @@ function pauseRecording() {
 }
 
 function resumeRecording() {
+  if (activeProvider === 'web-speech' || activeProvider === 'windows-speech') {
+    try { recognition?.start(); } catch { /* ignore */ }
+    setState('recording');
+    startTimerTick();
+    if (audioContext && audioContext.state === 'suspended') audioContext.resume();
+    return;
+  }
   if (!mediaRecorder || mediaRecorder.state !== 'paused') return;
   mediaRecorder.resume();
   setState('recording');
@@ -339,12 +427,63 @@ function resetToIdle() {
 }
 
 async function stopAndTranscribe(mode: OverlayMode = 'transcribe') {
-  if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
-
   stopTimerTick();
   stopWaveform();
   lastMode = mode;
   setState('processing');
+
+  if (activeProvider === 'windows-speech') {
+    // Windows SAPI path — stop PowerShell recognition and get accumulated text
+    const text = await window.overlayAPI.stopWindowsSpeech();
+
+    // Stop mic stream (used only for waveform)
+    if (audioStream) {
+      audioStream.getTracks().forEach(t => t.stop());
+      audioStream = null;
+    }
+
+    if (!text || !text.trim()) {
+      lastErrorMessage = 'No speech detected';
+      lastErrorCode = 'no-text';
+      lastErrorDetail = `Timestamp: ${new Date().toISOString()}\nMessage: No speech detected`;
+      setState('error');
+      return;
+    }
+
+    lastAudioBuffer = null;
+    lastDurationMs = 0;
+    await sendTextAndHandle(text.trim(), mode);
+    return;
+  }
+
+  if (activeProvider === 'web-speech') {
+    // Web Speech path — stop recognition and send collected text
+    try { recognition?.stop(); } catch { /* ignore */ }
+    recognition = null;
+
+    // Stop mic stream
+    if (audioStream) {
+      audioStream.getTracks().forEach(t => t.stop());
+      audioStream = null;
+    }
+
+    const text = finalTranscript.trim();
+    if (!text) {
+      lastErrorMessage = 'No speech detected';
+      lastErrorCode = 'no-text';
+      lastErrorDetail = `Timestamp: ${new Date().toISOString()}\nMessage: No speech detected`;
+      setState('error');
+      return;
+    }
+
+    lastAudioBuffer = null;
+    lastDurationMs = 0;
+    await sendTextAndHandle(text, mode);
+    return;
+  }
+
+  // MediaRecorder path
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
 
   const durationMs = recordingMs;
 
@@ -366,6 +505,11 @@ async function stopAndTranscribe(mode: OverlayMode = 'transcribe') {
 }
 
 async function retryLastTranscription() {
+  if (activeProvider === 'web-speech' || activeProvider === 'windows-speech') {
+    // Can't retry — no stored audio
+    resetToIdle();
+    return;
+  }
   if (!lastAudioBuffer) {
     resetToIdle();
     return;
@@ -382,6 +526,28 @@ async function sendAndHandle(buffer: ArrayBuffer, durationMs: number, mode: Over
       setTimeout(() => resetToIdle(), 800);
     } else {
       lastErrorMessage = response.error || 'Transcription failed';
+      lastErrorCode = response.errorCode || 'unknown';
+      lastErrorDetail = response.detail || `Timestamp: ${new Date().toISOString()}\nMessage: ${lastErrorMessage}`;
+      setState('error');
+    }
+  } catch (err) {
+    lastErrorMessage = err instanceof Error ? err.message : 'Unknown error';
+    lastErrorCode = 'unknown';
+    lastErrorDetail = err instanceof Error && err.stack
+      ? `Timestamp: ${new Date().toISOString()}\nMessage: ${err.message}\n\nStack trace:\n${err.stack}`
+      : `Timestamp: ${new Date().toISOString()}\nMessage: ${lastErrorMessage}`;
+    setState('error');
+  }
+}
+
+async function sendTextAndHandle(text: string, mode: OverlayMode) {
+  try {
+    const response = await window.overlayAPI.sendText(text, mode);
+    if (response.success) {
+      setState('success');
+      setTimeout(() => resetToIdle(), 800);
+    } else {
+      lastErrorMessage = response.error || 'Failed';
       lastErrorCode = response.errorCode || 'unknown';
       lastErrorDetail = response.detail || `Timestamp: ${new Date().toISOString()}\nMessage: ${lastErrorMessage}`;
       setState('error');
@@ -416,7 +582,7 @@ function bindDoneBtn(btn: HTMLElement) {
 function bindRefineBtn(btn: HTMLElement) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!geminiConfigured) return;
+    if (!aiConfigured) return;
     if (currentState === 'recording' || currentState === 'paused') stopAndTranscribe('transcribe-refine');
   });
 }
@@ -452,10 +618,15 @@ document.addEventListener('mouseup', () => {
 // ── IPC: auto-start from global shortcut ──
 window.overlayAPI.onAutoStart(async () => {
   try {
-    const status = await window.overlayAPI.getGeminiStatus();
-    geminiConfigured = status.configured;
+    const [aiStatus, providerStatus] = await Promise.all([
+      window.overlayAPI.getAiStatus(),
+      window.overlayAPI.getActiveProvider(),
+    ]);
+    aiConfigured = aiStatus.configured;
+    activeProvider = providerStatus.provider;
   } catch {
-    geminiConfigured = false;
+    aiConfigured = false;
+    activeProvider = 'web-speech';
   }
   startRecording();
 });
